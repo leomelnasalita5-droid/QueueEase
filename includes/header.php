@@ -23,6 +23,7 @@ $pageTitle = $pageTitle ?? 'QueueEase';
 
         <nav>
             <?php if ($user): ?>
+
                 <?php if ($user['role'] === 'admin'): ?>
                     <a href="<?= $base ?>admin/dashboard.php">Admin</a>
                 <?php else: ?>
@@ -34,6 +35,7 @@ $pageTitle = $pageTitle ?? 'QueueEase';
                     <input type="hidden" name="csrf_token" value="<?= clean(csrf_token()) ?>">
                     <button type="submit" class="nav-button">Logout</button>
                 </form>
+
             <?php else: ?>
                 <a href="<?= $base ?>login.php">Login</a>
                 <a href="<?= $base ?>register.php">Register</a>
@@ -43,11 +45,9 @@ $pageTitle = $pageTitle ?? 'QueueEase';
 </header>
 
 <main class="container">
-    <?php if ($flash): ?>
-        <div class="alert <?= clean($flash['type']) ?>">
-            <?= clean($flash['message']) ?>
-        </div>
-    <?php endif; ?>
-</main>
-</body>
-</html>
+
+<?php if ($flash): ?>
+    <div class="alert <?= clean($flash['type']) ?>">
+        <?= clean($flash['message']) ?>
+    </div>
+<?php endif; ?>
