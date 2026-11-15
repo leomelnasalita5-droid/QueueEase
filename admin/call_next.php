@@ -1,4 +1,3 @@
-
 <?php
 require_once '../includes/auth.php';
 require_admin();
@@ -19,38 +18,38 @@ if (!$serviceId) {
 try {
     $pdo->beginTransaction();
 
-    // Complete the currently serving queue.
+    // Serialize calls for this office.
+    $stmt = $pdo->prepare("SELECT id FROM services WHERE id = ? FOR UPDATE");
+    $stmt->execute([$serviceId]);
+
+    if (!$stmt->fetch()) {
+        throw new Exception('Office not found.');
+    }
+
     $stmt = $pdo->prepare("
         SELECT id FROM queues
-        WHERE service_id = ?
-        AND queue_date = CURDATE()
-        AND status = 'Serving'
+        WHERE service_id = ? AND queue_date = CURDATE()
+          AND status = 'Serving'
         FOR UPDATE
     ");
     $stmt->execute([$serviceId]);
     $current = $stmt->fetch();
 
     if ($current) {
-        $stmt = $pdo->prepare("
-            UPDATE queues
-            SET status = 'Completed'
-            WHERE id = ?
-        ");
-        $stmt->execute([$current['id']]);
+        $pdo->prepare("
+            UPDATE queues SET status = 'Completed' WHERE id = ?
+        ")->execute([$current['id']]);
 
-        $stmt = $pdo->prepare("
+        $pdo->prepare("
             INSERT INTO queue_history (queue_id, status, changed_by)
             VALUES (?, 'Completed', ?)
-        ");
-        $stmt->execute([$current['id'], current_user()['id']]);
+        ")->execute([$current['id'], current_user()['id']]);
     }
 
-    // Find the next waiting student.
     $stmt = $pdo->prepare("
         SELECT id FROM queues
-        WHERE service_id = ?
-        AND queue_date = CURDATE()
-        AND status = 'Waiting'
+        WHERE service_id = ? AND queue_date = CURDATE()
+          AND status = 'Waiting'
         ORDER BY queue_number ASC
         LIMIT 1
         FOR UPDATE
@@ -59,31 +58,28 @@ try {
     $next = $stmt->fetch();
 
     if ($next) {
-        $stmt = $pdo->prepare("
-            UPDATE queues
-            SET status = 'Serving'
-            WHERE id = ?
-        ");
-        $stmt->execute([$next['id']]);
+        $pdo->prepare("
+            UPDATE queues SET status = 'Serving' WHERE id = ?
+        ")->execute([$next['id']]);
 
-        $stmt = $pdo->prepare("
+        $pdo->prepare("
             INSERT INTO queue_history (queue_id, status, changed_by)
             VALUES (?, 'Serving', ?)
-        ");
-        $stmt->execute([$next['id'], current_user()['id']]);
+        ")->execute([$next['id'], current_user()['id']]);
 
-        set_flash('success', 'Next student has been called.');
+        $message = 'Next student has been called.';
     } else {
-        set_flash('success', 'No waiting students in this office.');
+        $message = 'No waiting students in this office.';
     }
 
     $pdo->commit();
+    set_flash('success', $message);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    set_flash('error', 'Unable to call the next student.');
+    set_flash('error', 'Unable to call the next student: ' . $e->getMessage());
 }
 
-redirect('dashboard.php?service=' . $serviceId);
+redirect('dashboard.php?service_id=' . $serviceId);
